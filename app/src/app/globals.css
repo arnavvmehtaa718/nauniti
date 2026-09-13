@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+/* ============================================================
+   NauNiti Design System — Deep Navy Maritime Intelligence Console
+   ============================================================ */
+
+@theme {
+  /* Surfaces */
+  --color-navy: #0a0e1a;
+  --color-panel: #0d1120;
+  --color-card: #131929;
+  --color-line: #1e2a3d;
+
+  /* Brand / accents */
+  --color-blue-nav: #1d4ed8;
+  --color-blue-glow: #2563eb;
+  --color-accent: #3b82f6;
+
+  /* Semantic */
+  --color-good: #10b981;
+  --color-warn: #f59e0b;
+  --color-bad: #ef4444;
+
+  /* Text */
+  --color-primary: #f0f4ff;
+  --color-secondary: #8899bb;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), Arial, Helvetica, sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+/* Light mode — overrides the design-token variables above.
+   Components reference these as var(--color-*), so swapping them restyles the
+   whole app. Dark remains the default when no .light class is present. */
+.light {
+  --color-navy: #f0f4fa;
+  --color-panel: #e4eaf4;
+  --color-card: #ffffff;
+  --color-line: #d2dcea;
+
+  --color-primary: #0e1a2e;
+  --color-secondary: #52627e;
+
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-navy);
+  color: var(--color-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle blueprint grid backdrop */
+.nau-grid {
+  background-image:
+    linear-gradient(rgba(59, 130, 246, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.04) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+/* Glow for active navigation */
+.nav-glow {
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.55), 0 0 18px rgba(37, 99, 235, 0.25);
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) var(--color-navy);
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-secondary);
+}
+
+::selection {
+  background: rgba(59, 130, 246, 0.35);
+}
+
+/* Recharts tweaks */
+.recharts-cartesian-grid line {
+  stroke: var(--color-line);
+  opacity: 0.6;
+}
+.recharts-tooltip-wrapper {
+  outline: none;
+}
