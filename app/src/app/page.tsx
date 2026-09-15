@@ -10,10 +10,10 @@ import {
   Loader2,
   Lock,
   Map,
+  PiggyBank,
   Sailboat,
   ShieldCheck,
   Ship,
-  Sparkles,
   User,
 } from "lucide-react";
 import { useAppStore, type UserRole } from "@/store/useAppStore";
@@ -29,18 +29,8 @@ const FEATURES = [
   { icon: LineChart, title: "Freight Rate Forecast", desc: "AI-driven 30-day rate outlook with confidence bands" },
   { icon: Map, title: "Route & Vessel Optimization", desc: "Compatibility checks against live port constraints" },
   { icon: ShieldCheck, title: "Risk Decision Intelligence", desc: "Quantified risk scores with suggested mitigations" },
-  { icon: PiggyBankIcon, title: "Cost Savings Analysis", desc: "Strategy comparisons yielding ₹1.48 Cr potential savings" },
+  { icon: PiggyBank, title: "Cost Savings Analysis", desc: "Strategy comparisons yielding potential savings" },
 ];
-
-function PiggyBankIcon(props: { className?: string }) {
-  return (
-    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z" />
-      <path d="M2 9v1c0 1.1.9 2 2 2h1" />
-      <path d="M16 11h.01" />
-    </svg>
-  );
-}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -76,10 +66,10 @@ export default function LoginPage() {
             </div>
             <div>
               <div className="text-2xl font-bold tracking-tight text-primary">
-                Nau<span className="text-accent">Niti</span>
+                Ocean<span className="text-accent">IQ</span>
               </div>
               <div className="text-[11px] font-medium uppercase tracking-widest text-secondary">
-                AI-Powered Maritime Chartering Intelligence
+                Maritime Chartering Intelligence
               </div>
             </div>
           </div>
@@ -108,16 +98,13 @@ export default function LoginPage() {
 
           <div className="mt-8 flex flex-wrap items-center gap-2 text-[10.5px] text-secondary">
             <span className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1">
-              <Anchor className="size-3" /> Hay Point → Paradip
+              <Anchor className="size-3" /> Hay Point \u2192 Paradip
             </span>
             <span className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1">
               <LineChart className="size-3" /> 30-day rate forecast
             </span>
             <span className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1">
-              <Sparkles className="size-3" /> 87% confidence
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1">
-              <ShieldCheck className="size-3" /> ₹1.48 Cr potential savings
+              <ShieldCheck className="size-3" /> Quantified risk scores
             </span>
           </div>
         </div>
@@ -219,7 +206,7 @@ export default function LoginPage() {
                 </>
               ) : (
                 <>
-                  Sign in to NauNiti <ArrowRight className="size-4" />
+                  Sign in to OceanIQ <ArrowRight className="size-4" />
                 </>
               )}
             </button>

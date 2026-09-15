@@ -6,17 +6,17 @@ import {
   Anchor,
   CalendarDays,
   ClipboardList,
-  FlaskConical,
+  FileDown,
   Loader2,
   MapPin,
   PackageSearch,
   Route,
+  ScrollText,
   Ship,
   Sparkles,
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import { DEMO_SCENARIO, PORTS, VESSELS } from "@/lib/mockData";
-import { formatUSD, CONTRACT_LABELS, type ContractStrategyKey } from "@/lib/calculations";
+import { DEFAULT_INPUTS, formatUSD, CONTRACT_LABELS, type ContractStrategyKey } from "@/lib/calculations";
 import { useAppStore } from "@/store/useAppStore";
 
 const CARGO_TYPES = ["Coal", "Iron Ore", "Coking Coal", "Thermal Coal", "Limestone", "Steel Products"];
@@ -25,42 +25,55 @@ const LOADING_PORTS: Record<string, string[]> = {
   Australia: ["Hay Point", "Newcastle", "Gladstone", "Dampier"],
   "South Africa": ["Richards Bay", "Saldanha"],
   Indonesia: ["Tanjung Bara", "Tarahan"],
-  Brazil: ["Tubarão", "Itaqui"],
+  Brazil: ["Tubar\u00E3o", "Itaqui"],
   USA: ["Marseilles", "Corpus Christi"],
   Russia: ["Nakhodka", "Murmansk"],
 };
 const HORIZONS = ["1 Month", "3 Months", "6 Months", "12 Months"];
+const DESTINATION_PORTS = ["Paradip", "Visakhapatnam", "Gangavaram", "Gopalpur", "Dhamra", "Haldia"];
 
 export default function ProcurementPage() {
   const router = useRouter();
-  const runScenario = useAppStore((s) => s.runScenario);
+  const runAnalysis = useAppStore((s) => s.runAnalysis);
+  const addReport = useAppStore((s) => s.addReport);
+  const reports = useAppStore((s) => s.reports);
   const pushToast = useAppStore((s) => s.pushToast);
+  const analysis = useAppStore((s) => s.procurement.analysis);
 
-  const [cargo, setCargo] = useState(DEMO_SCENARIO.cargo);
-  const [quantity, setQuantity] = useState(DEMO_SCENARIO.quantity);
-  const [voyages, setVoyages] = useState(DEMO_SCENARIO.voyages);
-  const [originCountry, setOriginCountry] = useState(DEMO_SCENARIO.originCountry);
-  const [loadingPort, setLoadingPort] = useState(DEMO_SCENARIO.loadingPort);
-  const [destinationPort, setDestinationPort] = useState(DEMO_SCENARIO.destinationPort);
-  const [horizon, setHorizon] = useState(DEMO_SCENARIO.contractHorizon);
-  const [contract, setContract] = useState<ContractStrategyKey>("short");
-  const [delivery, setDelivery] = useState(DEMO_SCENARIO.deliveryDate);
+  const [cargo, setCargo] = useState(DEFAULT_INPUTS.cargo);
+  const [quantity, setQuantity] = useState(DEFAULT_INPUTS.quantity);
+  const [voyages, setVoyages] = useState(DEFAULT_INPUTS.voyages);
+  const [originCountry, setOriginCountry] = useState(DEFAULT_INPUTS.originCountry);
+  const [loadingPort, setLoadingPort] = useState(DEFAULT_INPUTS.loadingPort);
+  const [destinationPort, setDestinationPort] = useState(DEFAULT_INPUTS.destinationPort);
+  const [horizon, setHorizon] = useState(DEFAULT_INPUTS.contractHorizon);
+  const [contract, setContract] = useState<ContractStrategyKey>(DEFAULT_INPUTS.contractStrategy);
+  const [delivery, setDelivery] = useState("15 Dec 2026");
   const [generating, setGenerating] = useState(false);
-
-  const destination = PORTS.find((p) => p.name === destinationPort) ?? PORTS[0];
-  const recommendedVessel = VESSELS.find((v) => v.recommended)?.type ?? "Panamax";
 
   const handleGenerate = () => {
     setGenerating(true);
-    runScenario({ contract });
+    runAnalysis({ cargo, quantity, voyages, originCountry, loadingPort, destinationPort, contractHorizon: horizon, contractStrategy: contract });
     setTimeout(() => {
       pushToast({
         kind: "success",
         title: "Analysis generated",
-        description: `Scenario locked: ${quantity.toLocaleString()} t ${cargo}, ${voyages} voyages, ${loadingPort} → ${destinationPort}.`,
+        description: `Scenario locked: ${quantity.toLocaleString()} t ${cargo}, ${voyages} voyages, ${loadingPort} \u2192 ${destinationPort}.`,
       });
+      setGenerating(false);
       router.push("/recommendation");
-    }, 1000);
+    }, 600);
+  };
+
+  const handleGenerateReport = () => {
+    runAnalysis({ cargo, quantity, voyages, originCountry, loadingPort, destinationPort, contractHorizon: horizon, contractStrategy: contract });
+    const report = addReport("PDF", ["Freight forecast", "Vessel compatibility", "Port congestion", "Route comparison", "Contract strategy", "Risk matrix"]);
+    pushToast({
+      kind: "success",
+      title: "Report generated",
+      description: `${report.name} (${report.cargo} \u00B7 ${report.quantity.toLocaleString()} t) \u00B7 ${report.route}`,
+    });
+    router.push(`/reports/${report.id}`);
   };
 
   const loadingPorts = LOADING_PORTS[originCountry] ?? LOADING_PORTS.Australia;
@@ -72,16 +85,7 @@ export default function ProcurementPage() {
     <div>
       <PageHeader
         title="New Procurement Analysis"
-        subtitle="Define charter requirements to generate a NauNiti decision brief with freight, vessel, port, route and contract recommendations."
-        right={
-          <button
-            onClick={() => router.push("/simulation")}
-            className="inline-flex items-center gap-2 rounded-lg border border-line px-3.5 py-2 text-[12.5px] font-medium text-secondary transition-colors hover:border-accent/40 hover:text-primary"
-          >
-            <FlaskConical className="size-4" />
-            Skip to What-If
-          </button>
-        }
+        subtitle="Define charter requirements to generate an OceanIQ decision brief with freight, vessel, port, route and contract recommendations."
       />
 
       <div className="grid gap-4 xl:grid-cols-3">
@@ -178,8 +182,8 @@ export default function ProcurementPage() {
                 Destination port
               </label>
               <select value={destinationPort} onChange={(e) => setDestinationPort(e.target.value)} className={inputClass}>
-                {PORTS.map((p) => (
-                  <option key={p.name}>{p.name}</option>
+                {DESTINATION_PORTS.map((p) => (
+                  <option key={p}>{p}</option>
                 ))}
               </select>
             </div>
@@ -218,7 +222,7 @@ export default function ProcurementPage() {
                     {key === "spot"
                       ? "Max flexibility, max exposure"
                       : key === "short"
-                        ? "Balanced · NauNiti default"
+                        ? "Balanced \u00B7 OceanIQ default"
                         : "Min cost, min flexibility"}
                   </div>
                 </button>
@@ -242,6 +246,23 @@ export default function ProcurementPage() {
                 </>
               )}
             </button>
+            <div className="mt-2.5 flex gap-2">
+              <button
+                onClick={handleGenerateReport}
+                className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-accent/40 bg-accent/10 text-[12.5px] font-medium text-accent transition-colors hover:bg-accent/20"
+              >
+                <FileDown className="size-4" /> Generate Report
+              </button>
+              <button
+                onClick={() => {
+                  const latest = reports[0];
+                  if (latest) router.push(`/reports/${latest.id}`);
+                }}
+                className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-line bg-panel text-[12.5px] font-medium text-secondary transition-colors hover:border-accent/40 hover:text-primary"
+              >
+                <ScrollText className="size-4" /> View Report
+              </button>
+            </div>
           </div>
         </div>
 
@@ -252,31 +273,31 @@ export default function ProcurementPage() {
               <ClipboardList className="size-3.5" /> Scenario summary
             </div>
             <div className="space-y-2.5">
-              <SummaryRow icon={PackageSearch} label="Cargo" value={`${cargo} · ${quantity.toLocaleString()} t · ${voyages} voyage${voyages > 1 ? "s" : ""}`} />
-              <SummaryRow icon={Route} label="Route" value={`${loadingPort}, ${originCountry} → ${destinationPort}`} />
-              <SummaryRow icon={Anchor} label="Discharge port" value={`${destination?.name} · draft ${destination?.maxDraft}m · congestion ${destination?.congestionLevel}%`} />
-              <SummaryRow icon={Ship} label="Recommended vessel" value={recommendedVessel} />
-              <SummaryRow icon={CalendarDays} label="Horizon / delivery" value={`${horizon} · ${delivery}`} />
+              <SummaryRow icon={PackageSearch} label="Cargo" value={`${cargo} \u00B7 ${quantity.toLocaleString()} t \u00B7 ${voyages} voyage${voyages > 1 ? "s" : ""}`} />
+              <SummaryRow icon={Route} label="Route" value={`${loadingPort}, ${originCountry} \u2192 ${destinationPort}`} />
+              <SummaryRow icon={Anchor} label="Discharge port" value={`${analysis.selectedPort.name} \u00B7 draft ${analysis.selectedPort.maxDraft}m \u00B7 congestion ${analysis.selectedPort.congestionLevel}%`} />
+              <SummaryRow icon={Ship} label="Recommended vessel" value={analysis.vessels.find((v) => v.recommended)?.type ?? "Panamax"} />
+              <SummaryRow icon={CalendarDays} label="Horizon / delivery" value={`${horizon} \u00B7 ${delivery}`} />
             </div>
           </div>
 
           <div className="rounded-xl border border-line bg-card p-4">
             <div className="text-[10px] uppercase tracking-wider text-secondary">Estimated program cost</div>
-            <div className="mt-1 text-[24px] font-semibold text-primary">{formatUSD(6_920_000)}</div>
-            <div className="text-[11px] text-good">−4.9% vs repeated spot ({formatUSD(360_000)} saved)</div>
+            <div className="mt-1 text-[24px] font-semibold text-primary">{formatUSD(analysis.costs.total)}</div>
+            <div className="text-[11px] text-good">
+              {analysis.savingsPercent > 0
+                ? `\u2212${analysis.savingsPercent}% vs repeated spot (${formatUSD(analysis.potentialSavingsUSD)} saved)`
+                : "At spot rate"}
+            </div>
             <div className="mt-2 flex items-center gap-1.5 text-[11px] text-secondary">
               <MapPin className="size-3.5 text-accent" />
-              Forecast confidence 87% · 30-day rate view: +11.5%
+              Forecast confidence {analysis.confidence}% \u00B7 30-day rate view: +{analysis.freight.forecastChange30d}%
             </div>
           </div>
 
           <p className="rounded-xl border border-line bg-panel p-3 text-[11px] leading-relaxed text-secondary">
-            Estimate uses the NauNiti deterministic cost engine across freight, fuel, port charges,
-            waiting/demurrage, repositioning and risk buffer. Adjust sliders in{" "}
-            <button onClick={() => router.push("/simulation")} className="font-medium text-accent hover:text-primary">
-              Simulation / What-If
-            </button>{" "}
-            for sensitivity analysis.
+            Estimate uses the OceanIQ deterministic cost engine across freight, fuel, port charges,
+            waiting/demurrage, repositioning and risk buffer. Adjust inputs above and re-run for updated results.
           </p>
         </div>
       </div>

@@ -1,16 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  ArrowRight,
   CheckSquare,
   Crown,
   Download,
   Eye,
   FileBarChart2,
   FileDown,
-  FileSpreadsheet,
   Loader2,
   Square,
 } from "lucide-react";
@@ -18,52 +16,44 @@ import PageHeader from "@/components/ui/PageHeader";
 import ChartCard from "@/components/ui/ChartCard";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import StatusBadge from "@/components/ui/StatusBadge";
-import Modal from "@/components/ui/Modal";
-import { REPORTS } from "@/lib/mockData";
-import { useAppStore } from "@/store/useAppStore";
-import api from "@/services/api";
+import { useAppStore, type GeneratedReport } from "@/store/useAppStore";
+import { formatUSD } from "@/lib/calculations";
 
-type Report = (typeof REPORTS)[number];
-
-const FORMATS = ["PDF", "Excel", "CSV"];
 const SCOPES = ["Full Decision Brief", "Cost & Savings Summary", "Risk Register", "Vessel & Port Annex"];
+const FORMATS = ["PDF", "Excel", "CSV"];
 const SECTIONS = ["Freight forecast", "Vessel compatibility", "Port congestion", "Route comparison", "Contract strategy", "Risk matrix"];
 
 export default function ReportsPage() {
+  const router = useRouter();
+  const analysis = useAppStore((s) => s.procurement.analysis);
+  const reports = useAppStore((s) => s.reports);
+  const addReport = useAppStore((s) => s.addReport);
   const pushToast = useAppStore((s) => s.pushToast);
-  const [reports, setReports] = useState<Report[]>([...REPORTS]);
+
+  const { inputs } = analysis;
+
   const [scope, setScope] = useState(SCOPES[0]);
   const [format, setFormat] = useState("PDF");
   const [sections, setSections] = useState<string[]>([SECTIONS[0], SECTIONS[4]]);
   const [generating, setGenerating] = useState(false);
-  const [preview, setPreview] = useState<Report | null>(null);
 
   const toggleSection = (s: string) =>
     setSections((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
 
   const generate = async () => {
     setGenerating(true);
-    const name = `${scope} · ${format}`;
-    await api.generateReport(name);
+    await new Promise((r) => setTimeout(r, 400));
+    const report = addReport(format, sections, scope);
     setGenerating(false);
-    const report: Report = {
-      id: reports.length + 1,
-      name: `${scope}`,
-      route: "Hay Point → Paradip",
-      cargo: "Coal",
-      date: "13 Sep 2026",
-      type: scope,
-      status: "READY",
-    };
-    setReports((r) => [report, ...r]);
     pushToast({
       kind: "success",
       title: "Report generated",
-      description: `${scope} (${format}) is ready in your saved reports${sections.length ? " · includes " + sections.length + " sections" : ""}.`,
+      description: `${report.name} (${format}) is ready in your saved reports${sections.length ? " \u00B7 includes " + sections.length + " sections" : ""}.`,
     });
+    router.push(`/reports/${report.id}`);
   };
 
-  const columns: Column<Report>[] = [
+  const columns: Column<GeneratedReport>[] = [
     {
       header: "Report",
       render: (r) => (
@@ -80,6 +70,7 @@ export default function ReportsPage() {
     },
     { header: "Type", render: (r) => <span className="text-secondary">{r.type}</span> },
     { header: "Cargo", render: (r) => <span className="text-secondary">{r.cargo}</span> },
+    { header: "Quantity", render: (r) => <span className="text-secondary">{r.quantity.toLocaleString()} t</span> },
     { header: "Generated", render: (r) => <span className="text-secondary">{r.date}</span> },
     { header: "Status", render: (r) => <StatusBadge status={r.status} tone="green" /> },
     {
@@ -87,14 +78,14 @@ export default function ReportsPage() {
       render: (r) => (
         <div className="flex justify-end gap-1">
           <button
-            onClick={() => setPreview(r)}
+            onClick={() => router.push(`/reports/${r.id}`)}
             className="grid size-7 place-items-center rounded-md border border-line text-secondary transition-colors hover:border-accent/40 hover:text-accent"
             title="Preview"
           >
             <Eye className="size-3.5" />
           </button>
           <button
-            onClick={() => pushToast({ kind: "success", title: "Download started", description: `${r.name} (${r.type}) is being exported.` })}
+            onClick={() => pushToast({ kind: "success", title: "Download started", description: `${r.name} (${r.format}) is being exported.` })}
             className="grid size-7 place-items-center rounded-md border border-line text-secondary transition-colors hover:border-good/40 hover:text-good"
             title="Download"
           >
@@ -109,11 +100,10 @@ export default function ReportsPage() {
     <div>
       <PageHeader
         title="Reports & Downloads"
-        subtitle="Exportable decision artifacts for the coal chartering program — ready the latest brief or generate a custom report."
+        subtitle={`Exportable decision artifacts for the ${inputs.cargo} chartering program \u2014 ready the latest brief or generate a custom report.`}
       />
 
       <div className="grid gap-4 xl:grid-cols-3">
-        {/* Latest report */}
         <div className="xl:col-span-2">
           <div className="relative overflow-hidden rounded-2xl border border-accent/35 bg-gradient-to-br from-card to-panel p-5">
             <div className="mb-2 inline-flex items-center gap-1.5 rounded-md bg-good/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-good">
@@ -121,33 +111,32 @@ export default function ReportsPage() {
             </div>
             <h2 className="text-[19px] font-semibold text-primary">{reports[0].name}</h2>
             <p className="mt-1 text-[12.5px] text-secondary">
-              {reports[0].route} · {reports[0].cargo} · generated {reports[0].date}
+              {reports[0].route} \u00B7 {reports[0].cargo} ({reports[0].quantity.toLocaleString()} t \u00B7 {reports[0].voyages} voyages) \u00B7 generated {reports[0].date}
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <MiniStat label="Expected cost" value="$6.92M" />
-              <MiniStat label="Savings" value="₹1.48 Cr" good />
-              <MiniStat label="Confidence" value="87%" />
+              <MiniStat label="Expected cost" value={formatUSD(reports[0].analysis.costs.total)} />
+              <MiniStat label="Savings" value={formatUSD(reports[0].analysis.potentialSavingsUSD)} good />
+              <MiniStat label="Confidence" value={`${reports[0].analysis.confidence}%`} />
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <button
-                onClick={() => setPreview(reports[0])}
+                onClick={() => router.push(`/reports/${reports[0].id}`)}
                 className="inline-flex items-center gap-2 rounded-lg bg-blue-nav px-4 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-blue-glow"
               >
                 <Eye className="size-4" /> Preview Brief
               </button>
               <button
                 onClick={() =>
-                  pushToast({ kind: "success", title: "Download started", description: "Australia–Paradip Analysis (PDF)" })
+                  pushToast({ kind: "success", title: "Download started", description: `${reports[0].name} (${reports[0].format})` })
                 }
                 className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-[12.5px] font-medium text-secondary transition-colors hover:border-accent/40 hover:text-primary"
               >
-                <Download className="size-4" /> Download PDF
+                <Download className="size-4" /> Download {reports[0].format}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Generate panel */}
         <div>
           <ChartCard title="Generate New Report" subtitle="Compose an exportable brief from the current scenario">
             <div className="space-y-3.5">
@@ -227,55 +216,19 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Saved reports */}
       <div className="mt-4">
         <ChartCard
           title="Saved Reports"
-          subtitle={`All generated artifacts · ${reports.length} on record`}
+          subtitle={`All generated artifacts \u00B7 ${reports.length} on record`}
           right={
-            <Link href="/risk" className="inline-flex items-center gap-1 text-[11.5px] font-medium text-accent hover:text-primary">
-              Related advisories <ArrowRight className="size-3.5" />
-            </Link>
+            <span className="inline-flex items-center gap-1 text-[11.5px] font-medium text-accent">
+              {inputs.loadingPort} \u2192 {inputs.destinationPort}
+            </span>
           }
         >
           <DataTable columns={columns} data={reports} rowKey={(r) => `${r.id}-${r.name}`} />
         </ChartCard>
       </div>
-
-      {/* Preview modal */}
-      <Modal open={!!preview} title={preview?.name ?? ""} subtitle={preview ? `${preview.type} · ${preview.date}` : ""} onClose={() => setPreview(null)} size="lg">
-        {preview && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-[11px] text-secondary">
-              <FileSpreadsheet className="size-4 text-accent" />
-              Route: <span className="text-primary">{preview.route}</span> · Cargo: <span className="text-primary">{preview.cargo}</span>
-            </div>
-            <div className="rounded-lg border border-line bg-panel p-4">
-              <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-secondary">Contents</div>
-              <ul className="space-y-1.5 text-[12px] text-secondary">
-                <li className="flex items-center gap-2"><CheckSquare className="size-3.5 text-accent" /> Executive decision summary</li>
-                <li className="flex items-center gap-2"><CheckSquare className="size-3.5 text-accent" /> Freight forecast & market drivers</li>
-                <li className="flex items-center gap-2"><CheckSquare className="size-3.5 text-accent" /> Vessel compatibility vs port constraints</li>
-                <li className="flex items-center gap-2"><CheckSquare className="size-3.5 text-accent" /> Port congestion outlook</li>
-                <li className="flex items-center gap-2"><CheckSquare className="size-3.5 text-accent" /> Route comparison & cost model</li>
-                <li className="flex items-center gap-2"><CheckSquare className="size-3.5 text-accent" /> Contract strategy & savings</li>
-                <li className="flex items-center gap-2"><CheckSquare className="size-3.5 text-accent" /> Risk register & mitigations</li>
-              </ul>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  pushToast({ kind: "success", title: "Download started", description: `${preview.name} (${preview.type})` });
-                  setPreview(null);
-                }}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-nav px-4 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-blue-glow"
-              >
-                <Download className="size-4" /> Download
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }

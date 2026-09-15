@@ -17,7 +17,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <Topbar />
         <main className="flex-1 px-6 py-6">{children}</main>
         <footer className="border-t border-line px-6 py-3 text-[10.5px] text-secondary/80">
-          NauNiti · AI-Powered Maritime Chartering Decision Intelligence · Prototype build — all
+          OceanIQ · AI-Powered Maritime Chartering Decision Intelligence · Prototype build — all
           figures are illustrative demo data.
         </footer>
       </div>

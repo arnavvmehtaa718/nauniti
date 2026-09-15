@@ -14,7 +14,6 @@ import {
 } from "recharts";
 import {
   Anchor,
-  ArrowRight,
   Gauge,
   MapPin,
   Ship,
@@ -26,8 +25,8 @@ import ChartCard from "@/components/ui/ChartCard";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import RiskBadge from "@/components/ui/RiskBadge";
 import PortCard from "@/components/domain/PortCard";
-import { PORT_CONGESTION_CHART_DATA, PORTS, type Port } from "@/lib/mockData";
-import Link from "next/link";
+import { useAppStore } from "@/store/useAppStore";
+import type { PortDetail } from "@/lib/calculations";
 
 function CongestionTooltip({
   active,
@@ -54,9 +53,23 @@ function CongestionTooltip({
 }
 
 export default function PortsPage() {
-  const [selectedPort, setSelectedPort] = useState<Port>(PORTS[0]);
+  const analysis = useAppStore((s) => s.procurement.analysis);
+  const [selectedPort, setSelectedPort] = useState<PortDetail>(analysis.selectedPort);
 
-  const comparisonColumns: Column<Port>[] = [
+  const { inputs } = analysis;
+
+  const congestionChart = [
+    { date: "1 Sep", actual: +(selectedPort.waitingTime * 0.8).toFixed(1), forecast: null as number | null },
+    { date: "5 Sep", actual: +(selectedPort.waitingTime * 0.89).toFixed(1), forecast: null },
+    { date: "10 Sep", actual: +(selectedPort.waitingTime * 1.0).toFixed(1), forecast: null },
+    { date: "13 Sep", actual: +(selectedPort.waitingTime * 1.0).toFixed(1), forecast: selectedPort.waitingTime },
+    { date: "17 Sep", actual: null, forecast: +(selectedPort.waitingTime * 1.09).toFixed(1) },
+    { date: "20 Sep", actual: null, forecast: +(selectedPort.waitingTime * 1.17).toFixed(1) },
+    { date: "25 Sep", actual: null, forecast: +(selectedPort.waitingTime * 1.11).toFixed(1) },
+    { date: "30 Sep", actual: null, forecast: +(selectedPort.waitingTime * 1.03).toFixed(1) },
+  ];
+
+  const comparisonColumns: Column<PortDetail>[] = [
     {
       header: "Port",
       render: (p) => (
@@ -66,7 +79,7 @@ export default function PortsPage() {
           </span>
           <div>
             <div className="font-medium text-primary">{p.name}</div>
-            <div className="text-[10px] text-secondary">{p.state} · {p.coast}</div>
+            <div className="text-[10px] text-secondary">Discharge port</div>
           </div>
         </div>
       ),
@@ -81,7 +94,7 @@ export default function PortsPage() {
               style={{ width: `${p.congestionLevel}%` }}
             />
           </div>
-          <span className="text-[11px] text-secondary">{p.congestion} · {p.congestionLevel}%</span>
+          <span className="text-[11px] text-secondary">{p.congestion} \u00B7 {p.congestionLevel}%</span>
         </div>
       ),
     },
@@ -123,18 +136,35 @@ export default function PortsPage() {
         subtitle={`Discharge-port intelligence for the ${selectedPort.name} option, including infrastructure constraints, congestion outlook and coast-wide comparison.`}
       />
 
-      {/* Port selector */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {PORTS.slice(0, 6).map((p) => (
-          <PortCard key={p.name} port={p} selected={selectedPort.name === p.name} onSelect={setSelectedPort} />
+        {analysis.allPorts.slice(0, 6).map((p) => (
+          <PortCard
+            key={p.name}
+            port={{
+              name: p.name,
+              country: "India",
+              congestion: p.congestion,
+              congestionLevel: p.congestionLevel,
+              waitingTime: p.waitingTime,
+              cargoHandlingCapacity: p.cargoHandlingCapacity,
+              maxDraft: p.maxDraft,
+              maxLOA: p.maxLOA,
+              maxBeam: p.maxBeam,
+              berthsAvailable: p.berthsAvailable,
+              totalBerths: p.totalBerths,
+              suitableVessels: p.suitableVessels,
+              riskLevel: p.riskLevel,
+            }}
+            selected={selectedPort.name === p.name}
+            onSelect={setSelectedPort as any}
+          />
         ))}
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
-        {/* Congestion chart */}
         <div className="xl:col-span-2">
           <ChartCard
-            title={`Waiting-Time Outlook — ${selectedPort.name}`}
+            title={`Waiting-Time Outlook \u2014 ${selectedPort.name}`}
             subtitle="Observed average anchorage delay with a 2-week forecast (days)"
             right={
               <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10.5px] font-medium uppercase tracking-wider ${
@@ -145,7 +175,7 @@ export default function PortsPage() {
             }
           >
             <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={PORT_CONGESTION_CHART_DATA} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
+              <ComposedChart data={congestionChart} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
                 <defs>
                   <linearGradient id="waitBand" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.15} />
@@ -171,37 +201,23 @@ export default function PortsPage() {
           </ChartCard>
         </div>
 
-        {/* Infrastructure constraints */}
         <div>
-          <ChartCard title="Infrastructure Constraints" subtitle={`${selectedPort.name} · physical limits`}>
+          <ChartCard title="Infrastructure Constraints" subtitle={`${selectedPort.name} \u00B7 physical limits`}>
             <div className="space-y-2">
               <ConstraintRow label="Max draft" value={selectedPort.maxDraft} unit="m" note={selectedPort.maxDraft >= 14 ? "Panamax OK" : "Panamax restricted"} tone={selectedPort.maxDraft >= 14 ? "good" : "warn"} />
               <ConstraintRow label="Max LOA" value={selectedPort.maxLOA} unit="m" note={selectedPort.maxLOA >= 225 ? "Panamax OK" : "Panamax restricted"} tone={selectedPort.maxLOA >= 225 ? "good" : "warn"} />
-              <ConstraintRow label="Max beam" value={selectedPort.maxBeam} unit="m" note={selectedPort.maxBeam >= 40 ? "No restriction" : "Within limits"} tone={selectedPort.maxBeam >= 40 ? "good" : "good"} />
-              <ConstraintRow label="Cargo handling" value={selectedPort.cargoHandlingCapacity / 1000} unit="K t/day" note={selectedPort.cargoHandlingCapacity >= 70000 ? "70K t fits" : "70K t at risk"} tone={selectedPort.cargoHandlingCapacity >= 70000 ? "good" : "bad"} />
+              <ConstraintRow label="Max beam" value={selectedPort.maxBeam} unit="m" note="No restriction" tone="good" />
+              <ConstraintRow label="Cargo handling" value={selectedPort.cargoHandlingCapacity / 1000} unit="K t/day" note={`${inputs.quantity.toLocaleString()} t fits`} tone={selectedPort.cargoHandlingCapacity >= inputs.quantity ? "good" : "bad"} />
               <ConstraintRow label="Operating berths" value={selectedPort.berthsAvailable} unit={`of ${selectedPort.totalBerths}`} note={`${selectedPort.totalBerths - selectedPort.berthsAvailable} busy`} tone={selectedPort.berthsAvailable < 2 ? "bad" : "good"} />
             </div>
-            <Link
-              href="/vessels"
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-nav py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-blue-glow"
-            >
-              Check vessel compatibility <ArrowRight className="size-3.5" />
-            </Link>
           </ChartCard>
         </div>
       </div>
 
-      {/* Comparison table */}
       <div className="mt-4">
-        <ChartCard title="Port Comparison — East Coast India" subtitle="All candidate discharge terminals ranked by congestion, capacity and risk">
-          <DataTable columns={comparisonColumns} data={PORTS} rowKey={(p) => p.name} />
+        <ChartCard title="Port Comparison \u2014 East Coast India" subtitle="All candidate discharge terminals ranked by congestion, capacity and risk">
+          <DataTable columns={comparisonColumns} data={analysis.allPorts} rowKey={(p) => p.name} />
         </ChartCard>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <SummaryStat icon={Gauge} label="Best availability" value="Gangavaram" sub="25% congestion · 1.2 d wait" tone="good" />
-        <SummaryStat icon={Waves} label="Deepest draft" value="Gangavaram" sub="16.5 m max · cape-size capable" tone="accent" />
-        <SummaryStat icon={Anchor} label="NauNiti pick" value="Paradip" sub="Closest to SAIL plants · 85K t/d" tone="blue" />
       </div>
     </div>
   );
@@ -237,32 +253,6 @@ function ConstraintRow({
         <div className="text-[14px] font-semibold text-primary">{value} {unit}</div>
       </div>
       <span className={`text-[10.5px] ${color}`}>{note}</span>
-    </div>
-  );
-}
-
-function SummaryStat({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  icon: typeof Gauge;
-  label: string;
-  value: string;
-  sub: string;
-  tone: "good" | "accent" | "blue";
-}) {
-  const color = tone === "good" ? "text-good" : "text-accent";
-  return (
-    <div className="rounded-xl border border-line bg-card p-4">
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-secondary">
-        <Icon className={`size-3.5 ${color}`} />
-        {label}
-      </div>
-      <div className="mt-1.5 text-[15px] font-semibold text-primary">{value}</div>
-      <div className="text-[11px] text-secondary">{sub}</div>
     </div>
   );
 }

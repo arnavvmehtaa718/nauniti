@@ -19,37 +19,39 @@ import PageHeader from "@/components/ui/PageHeader";
 import KpiCard from "@/components/ui/KpiCard";
 import ChartCard from "@/components/ui/ChartCard";
 import DataTable, { type Column } from "@/components/ui/DataTable";
-import { COST_SAVINGS } from "@/lib/mockData";
+import { useAppStore } from "@/store/useAppStore";
 import { formatUSD, formatINR } from "@/lib/calculations";
 
 export default function CostSavingsPage() {
-  // truthful grouped data by category
+  const analysis = useAppStore((s) => s.procurement.analysis);
+  const { costs, strategies, potentialSavingsUSD, potentialSavingsINR, savingsPercent, inputs } = analysis;
+
+  const spotStrat = strategies.find((s) => s.code === "SPOT") ?? strategies[0];
+  const optStrat = strategies.find((s) => s.recommended) ?? strategies[1];
+
   const grouped = [
-    { category: "Freight", current: COST_SAVINGS.currentStrategy.freightCost, optimized: COST_SAVINGS.optimizedStrategy.freightCost },
-    { category: "Fuel", current: COST_SAVINGS.currentStrategy.fuelCost, optimized: COST_SAVINGS.optimizedStrategy.fuelCost },
-    { category: "Port Charges", current: COST_SAVINGS.currentStrategy.portCharges, optimized: COST_SAVINGS.optimizedStrategy.portCharges },
-    { category: "Waiting/Demurrage", current: COST_SAVINGS.currentStrategy.waitingDemurrage, optimized: COST_SAVINGS.optimizedStrategy.waitingDemurrage },
-    { category: "Repositioning", current: COST_SAVINGS.currentStrategy.repositioningCost, optimized: COST_SAVINGS.optimizedStrategy.repositioningCost },
+    { category: "Freight", current: spotStrat.totalCost * 0.844, optimized: costs.freightCost },
+    { category: "Fuel", current: spotStrat.totalCost * 0.061, optimized: costs.fuelCost },
+    { category: "Port Charges", current: spotStrat.totalCost * 0.049, optimized: costs.portCharges },
+    { category: "Waiting/Demurrage", current: spotStrat.totalCost * 0.035, optimized: costs.waitingDemurrage },
+    { category: "Repositioning", current: spotStrat.totalCost * 0.013, optimized: costs.repositioningCost },
   ];
 
   const currentPie = [
-    { name: "Freight", value: COST_SAVINGS.currentStrategy.freightCost, key: "freight" },
-    { name: "Fuel", value: COST_SAVINGS.currentStrategy.fuelCost, key: "fuel" },
-    { name: "Port Charges", value: COST_SAVINGS.currentStrategy.portCharges, key: "portCharges" },
-    { name: "Demurrage", value: COST_SAVINGS.currentStrategy.waitingDemurrage, key: "demurrage" },
-    { name: "Repositioning", value: COST_SAVINGS.currentStrategy.repositioningCost, key: "repositioning" },
+    { name: "Freight", value: grouped[0].current, key: "freight" },
+    { name: "Fuel", value: grouped[1].current, key: "fuel" },
+    { name: "Port Charges", value: grouped[2].current, key: "portCharges" },
+    { name: "Demurrage", value: grouped[3].current, key: "demurrage" },
+    { name: "Repositioning", value: grouped[4].current, key: "repositioning" },
   ];
 
-  const optimizedPie = currentPie.map((p) => {
-    const map: Record<string, number> = {
-      freight: COST_SAVINGS.optimizedStrategy.freightCost,
-      fuel: COST_SAVINGS.optimizedStrategy.fuelCost,
-      portCharges: COST_SAVINGS.optimizedStrategy.portCharges,
-      demurrage: COST_SAVINGS.optimizedStrategy.waitingDemurrage,
-      repositioning: COST_SAVINGS.optimizedStrategy.repositioningCost,
-    };
-    return { ...p, value: map[p.key] };
-  });
+  const optimizedPie = [
+    { name: "Freight", value: grouped[0].optimized, key: "freight" },
+    { name: "Fuel", value: grouped[1].optimized, key: "fuel" },
+    { name: "Port Charges", value: grouped[2].optimized, key: "portCharges" },
+    { name: "Demurrage", value: grouped[3].optimized, key: "demurrage" },
+    { name: "Repositioning", value: grouped[4].optimized, key: "repositioning" },
+  ];
 
   const columns: Column<typeof grouped[number]>[] = [
     { header: "Cost Component", render: (r) => <span className="font-medium text-primary">{r.category}</span> },
@@ -61,9 +63,9 @@ export default function CostSavingsPage() {
       render: (r) => {
         const delta = r.current - r.optimized;
         return delta >= 0 ? (
-          <span className="font-semibold text-good">−{formatUSD(delta)}</span>
+          <span className="font-semibold text-good">\u2212{formatUSD(delta)}</span>
         ) : (
-          <span className="font-semibold text-bad">+{formatUSD(delta)}</span>
+          <span className="font-semibold text-bad">+{formatUSD(Math.abs(delta))}</span>
         );
       },
     },
@@ -73,7 +75,7 @@ export default function CostSavingsPage() {
     <div>
       <PageHeader
         title="Cost & Savings"
-        subtitle="Current repeated-spot procurement vs the NauNiti-optimized charter structure for the full program."
+        subtitle={`Current repeated-spot procurement vs the OceanIQ-optimized charter structure for the ${inputs.voyages}-voyage program.`}
         right={
           <Link
             href="/contracts"
@@ -85,14 +87,13 @@ export default function CostSavingsPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard label="Current Strategy Cost" value={formatUSD(COST_SAVINGS.currentStrategy.totalCost)} sub={COST_SAVINGS.currentStrategy.name} icon={Wallet} tone="default" />
-        <KpiCard label="Optimized Cost" value={formatUSD(COST_SAVINGS.optimizedStrategy.totalCost)} sub="Short-Term Multiple-Voyage" icon={Scale} tone="blue" />
-        <KpiCard label="Total Savings" value={formatUSD(COST_SAVINGS.potentialSavingsUSD)} sub="across 4 voyages" icon={PiggyBank} tone="green" changeText="worth maintaining" />
-        <KpiCard label="Savings (INR)" value={formatINR(COST_SAVINGS.potentialSavingsINR)} sub={`${COST_SAVINGS.savingsPercent}% cheaper than spot`} icon={TrendingDown} tone="green" changeText="−4.9% cost" changeDirection="down" />
+        <KpiCard label="Current Strategy Cost" value={formatUSD(spotStrat.totalCost)} sub={spotStrat.name} icon={Wallet} tone="default" />
+        <KpiCard label="Optimized Cost" value={formatUSD(optStrat.totalCost)} sub={optStrat.name} icon={Scale} tone="blue" />
+        <KpiCard label="Total Savings" value={formatUSD(potentialSavingsUSD)} sub={`across ${inputs.voyages} voyages`} icon={PiggyBank} tone="green" changeText="worth maintaining" />
+        <KpiCard label="Savings (INR)" value={formatINR(potentialSavingsINR)} sub={`${savingsPercent}% cheaper than spot`} icon={TrendingDown} tone="green" changeText={`\u2212${savingsPercent}% cost`} changeDirection="down" />
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        {/* Grouped comparison */}
         <ChartCard title="Cost Comparison by Component" subtitle="Current vs optimized across the full program">
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={grouped} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
@@ -112,15 +113,14 @@ export default function CostSavingsPage() {
             </BarChart>
           </ResponsiveContainer>
           <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-secondary">
-            <span>Freight is the dominant lever — optimized structure saves <span className="font-medium text-good">{formatUSD(COST_SAVINGS.currentStrategy.freightCost - COST_SAVINGS.optimizedStrategy.freightCost)}</span> on charter rates alone.</span>
+            <span>Freight is the dominant lever — optimized structure saves <span className="font-medium text-good">{formatUSD(spotStrat.totalCost * 0.844 - costs.freightCost)}</span> on charter rates alone.</span>
           </div>
         </ChartCard>
 
-        {/* Donuts */}
         <ChartCard title="Cost Structure" subtitle="Composition of the current and optimized strategies">
           <div className="grid gap-4 sm:grid-cols-2">
-            <PieDonut data={currentPie} title="Current (Spot)" total={COST_SAVINGS.currentStrategy.totalCost} />
-            <PieDonut data={optimizedPie} title="Optimized (MVP)" total={COST_SAVINGS.optimizedStrategy.totalCost} highlight />
+            <PieDonut data={currentPie} title="Current (Spot)" total={spotStrat.totalCost} />
+            <PieDonut data={optimizedPie} title="Optimized (MVP)" total={optStrat.totalCost} highlight />
           </div>
         </ChartCard>
       </div>
@@ -134,11 +134,10 @@ export default function CostSavingsPage() {
       <div className="mt-4 flex items-start gap-3 rounded-xl border border-good/30 bg-good/5 p-4">
         <PiggyBank className="mt-0.5 size-4 shrink-0 text-good" />
         <p className="text-[12px] leading-relaxed text-secondary">
-          <span className="font-semibold text-good">NauNiti insight:</span> switching to the Short-Term
-          Multiple-Voyage contract program-wide realises an estimated{" "}
-          <span className="font-medium text-primary">{formatUSD(COST_SAVINGS.potentialSavingsUSD)}</span> (≈
-          {formatINR(COST_SAVINGS.potentialSavingsINR)}) while keeping the flexibility to renegotiate after the
-          horizon — a {COST_SAVINGS.savingsPercent}% reduction in all-in procurement cost.
+          <span className="font-semibold text-good">OceanIQ insight:</span> switching to the {optStrat.name} contract program-wide realises an estimated{" "}
+          <span className="font-medium text-primary">{formatUSD(potentialSavingsUSD)}</span> ({"\u2248"}
+          {formatINR(potentialSavingsINR)}) while keeping the flexibility to renegotiate after the
+          horizon — a {savingsPercent}% reduction in all-in procurement cost.
         </p>
       </div>
     </div>

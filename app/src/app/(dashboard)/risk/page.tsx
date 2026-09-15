@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import {
-  ArrowRight,
   Bell,
   CheckCircle2,
   ShieldAlert,
@@ -15,21 +14,24 @@ import RiskBadge from "@/components/ui/RiskBadge";
 import StatusBadge from "@/components/ui/StatusBadge";
 import RiskGauge from "@/components/domain/RiskGauge";
 import AlertCard, { type AlertItem } from "@/components/domain/AlertCard";
-import { ALERTS, RISKS, RISK_SCORE, type Risk } from "@/lib/mockData";
 import { useAppStore } from "@/store/useAppStore";
+import type { RiskItem } from "@/lib/calculations";
 
 export default function RiskPage() {
+  const analysis = useAppStore((s) => s.procurement.analysis);
   const pushToast = useAppStore((s) => s.pushToast);
 
+  const { risks, alerts, riskScore, inputs } = analysis;
+
   const actions = Object.values(
-    RISKS.reduce<Record<string, { action: string; count: number }>>((acc, r) => {
+    risks.reduce<Record<string, { action: string; count: number }>>((acc, r) => {
       acc[r.suggestedAction] = acc[r.suggestedAction] ?? { action: r.suggestedAction, count: 0 };
       acc[r.suggestedAction].count += 1;
       return acc;
     }, {})
   );
 
-  const columns: Column<Risk>[] = [
+  const columns: Column<RiskItem>[] = [
     {
       header: "Risk Category",
       render: (r) => (
@@ -49,7 +51,7 @@ export default function RiskPage() {
       render: (r) => (
         <button
           onClick={() =>
-            pushToast({ kind: "info", title: r.suggestedAction, description: `Advisory queued for “${r.category}”.` })
+            pushToast({ kind: "info", title: r.suggestedAction, description: `Advisory queued for "${r.category}".` })
           }
           className="inline-flex items-center gap-1.5 text-[12px] font-medium text-accent transition-colors hover:text-primary"
         >
@@ -63,34 +65,32 @@ export default function RiskPage() {
   return (
     <div>
       <PageHeader
-        title="Risk & Alerts Center"
-        subtitle="Quantified risk posture for the 70,000 t coal program with live advisories and recommended mitigation actions."
+        title="Risk & Alerts"
+        subtitle={`Quantified risk posture for the ${inputs.quantity.toLocaleString()} t ${inputs.cargo} program with live advisories and recommended mitigation actions.`}
         right={
           <span className="inline-flex items-center gap-1.5 rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-[12px] font-medium text-warn">
             <Bell className="size-4" />
-            {ALERTS.filter((a) => a.status === "New").length} new alerts
+            {alerts.filter((a) => a.status === "New").length} new alerts
           </span>
         }
       />
 
       <div className="grid gap-4 xl:grid-cols-3">
-        {/* Gauge */}
         <div>
           <ChartCard title="Program Risk Score" subtitle="Composite of market, port, weather & operations">
             <div className="flex justify-center">
-              <RiskGauge score={RISK_SCORE} />
+              <RiskGauge score={riskScore} />
             </div>
             <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-warn/25 bg-warn/5 p-3 text-[11.5px] leading-relaxed text-secondary">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-warn" />
               <span>
                 Score is driven chiefly by <span className="text-warn">freight volatility</span> and{" "}
-                <span className="text-warn">port congestion</span>. Current posture is manageable but trending up.
+                <span className="text-warn">port congestion</span>. Current posture is {analysis.riskLevel.toLowerCase()}.
               </span>
             </div>
           </ChartCard>
         </div>
 
-        {/* Recommended actions */}
         <div>
           <ChartCard title="Recommended Actions" subtitle="Grouped mitigation across all open risks">
             <div className="space-y-2">
@@ -106,20 +106,13 @@ export default function RiskPage() {
                 </div>
               ))}
             </div>
-            <Link
-              href="/simulation"
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-nav py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-blue-glow"
-            >
-              Stress-test with simulation <ArrowRight className="size-3.5" />
-            </Link>
           </ChartCard>
         </div>
 
-        {/* Alerts timeline */}
         <div className="xl:row-span-2">
           <ChartCard title="Alerts Timeline" subtitle="Chronological operational advisories">
             <div className="space-y-2.5">
-              {ALERTS.map((a) => (
+              {alerts.map((a) => (
                 <AlertCard
                   key={a.id}
                   alert={a as AlertItem}
@@ -132,10 +125,9 @@ export default function RiskPage() {
           </ChartCard>
         </div>
 
-        {/* Matrix */}
         <div className="xl:col-span-2">
-          <ChartCard title="Risk Matrix" subtitle="Probability × impact with mitigation and status">
-            <DataTable columns={columns} data={RISKS} rowKey={(r) => r.category} />
+          <ChartCard title="Risk Matrix" subtitle="Probability \u00D7 impact with mitigation and status">
+            <DataTable columns={columns} data={risks} rowKey={(r) => r.category} />
           </ChartCard>
         </div>
       </div>

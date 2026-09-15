@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import {
   Anchor,
-  ArrowRight,
   Clock,
   Fuel,
   Map,
@@ -17,13 +15,16 @@ import ChartCard from "@/components/ui/ChartCard";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import RiskBadge from "@/components/ui/RiskBadge";
 import RouteVisualization from "@/components/domain/RouteVisualization";
-import { ROUTES, type Route } from "@/lib/mockData";
+import { useAppStore } from "@/store/useAppStore";
 import { formatUSD } from "@/lib/calculations";
+import type { RouteOption } from "@/lib/calculations";
 
 export default function RoutesPage() {
-  const recommended = ROUTES.find((r) => r.recommended) ?? ROUTES[0];
+  const analysis = useAppStore((s) => s.procurement.analysis);
+  const { routes, inputs } = analysis;
+  const recommended = routes.find((r) => r.recommended) ?? routes[0];
 
-  const columns: Column<Route>[] = [
+  const columns: Column<RouteOption>[] = [
     {
       header: "Route",
       render: (r) => (
@@ -40,7 +41,7 @@ export default function RoutesPage() {
                 </span>
               )}
             </div>
-            <div className="text-[10px] text-secondary">{r.origin} → {r.destination}</div>
+            <div className="text-[10px] text-secondary">{r.origin} \u2192 {r.destination}</div>
           </div>
         </div>
       ),
@@ -59,23 +60,14 @@ export default function RoutesPage() {
     <div>
       <PageHeader
         title="Route Optimization"
-        subtitle="Transit options for Hay Point → Paradip (Panamax, 70,000 t) screened for time, cost and operational risk."
+        subtitle={`Transit options for ${inputs.loadingPort} \u2192 ${inputs.destinationPort} (${analysis.vessels.find((v) => v.recommended)?.type ?? "Panamax"}, ${inputs.quantity.toLocaleString()} t) screened for time, cost and operational risk.`}
       />
 
       <div className="grid gap-4 xl:grid-cols-3">
-        {/* Visualization */}
         <div className="xl:col-span-2">
           <ChartCard
             title="Recommended Corridor"
             subtitle="Animating vessel position along the optimized great-circle transit"
-            right={
-              <Link
-                href="/simulation"
-                className="inline-flex items-center gap-1 text-[11.5px] font-medium text-accent hover:text-primary"
-              >
-                What-if <ArrowRight className="size-3.5" />
-              </Link>
-            }
           >
             <RouteVisualization
               origin={recommended.origin}
@@ -87,9 +79,8 @@ export default function RoutesPage() {
           </ChartCard>
         </div>
 
-        {/* Metrics */}
         <div className="flex flex-col gap-4">
-          <ChartCard title="Recommended Route Metrics" subtitle="Hay Point → Paradip">
+          <ChartCard title="Recommended Route Metrics" subtitle={`${recommended.origin} \u2192 ${recommended.destination}`}>
             <div className="grid grid-cols-2 gap-2.5">
               <Metric icon={Navigation} label="Distance" value={`${recommended.distance.toLocaleString()} nm`} />
               <Metric icon={Clock} label="Transit time" value={`${recommended.duration} days`} />
@@ -112,10 +103,9 @@ export default function RoutesPage() {
         </div>
       </div>
 
-      {/* Comparison table */}
       <div className="mt-4">
         <ChartCard title="Route Comparison" subtitle="All screened transit alternatives with cost components">
-          <DataTable columns={columns} data={ROUTES} rowKey={(r) => r.name} />
+          <DataTable columns={columns} data={routes} rowKey={(r) => r.name} />
         </ChartCard>
       </div>
 

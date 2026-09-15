@@ -22,36 +22,38 @@ import RiskBadge from "@/components/ui/RiskBadge";
 import LoadingState from "@/components/ui/LoadingState";
 import ForecastChart from "@/components/domain/ForecastChart";
 import AlertCard, { type AlertItem } from "@/components/domain/AlertCard";
-import api from "@/services/api";
-import { formatUSD } from "@/lib/calculations";
-import type { Port, Vessel } from "@/lib/mockData";
 import { useAppStore } from "@/store/useAppStore";
-
-interface DashboardData {
-  rates: typeof import("@/lib/mockData").FREIGHT_RATES;
-  chart: typeof import("@/lib/mockData").FREIGHT_CHART_DATA;
-  ports: Port[];
-  vessels: Vessel[];
-  alerts: AlertItem[];
-}
+import { formatUSD } from "@/lib/calculations";
+import type { PortDetail } from "@/lib/calculations";
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const analysis = useAppStore((s) => s.procurement.analysis);
   const userName = useAppStore((s) => s.userName);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    let alive = true;
-    api.getFullDashboard().then((d) => {
-      if (alive) setData(d);
-    });
-    return () => {
-      alive = false;
-    };
+    const t = setTimeout(() => setLoaded(true), 300);
+    return () => clearTimeout(t);
   }, []);
 
-  if (!data) return <LoadingState full label="Assembling decision intelligence…" />;
+  if (!loaded) return <LoadingState full label="Assembling decision intelligence…" />;
 
-  const portColumns: Column<Port>[] = [
+  const { freight, vessels, allPorts, routes, costs, riskScore, alerts, inputs, potentialSavingsUSD, potentialSavingsINR, savingsPercent, confidence } = analysis;
+  const recommended = routes.find((r) => r.recommended) ?? routes[0];
+  const chart = [
+    { date: "13 Aug", rate: Math.round(freight.current * 0.89), forecast: null as number | null, lower: null as number | null, upper: null as number | null },
+    { date: "20 Aug", rate: Math.round(freight.current * 0.91), forecast: null, lower: null, upper: null },
+    { date: "27 Aug", rate: Math.round(freight.current * 0.935), forecast: null, lower: null, upper: null },
+    { date: "03 Sep", rate: Math.round(freight.current * 0.965), forecast: null, lower: null, upper: null },
+    { date: "10 Sep", rate: Math.round(freight.current * 0.985), forecast: null, lower: null, upper: null },
+    { date: "13 Sep", rate: freight.current, forecast: freight.current, lower: freight.current - 250, upper: freight.current + 250 },
+    { date: "20 Sep", rate: null, forecast: Math.round(freight.current * 1.03), lower: Math.round(freight.current * 1.005), upper: Math.round(freight.current * 1.055) },
+    { date: "27 Sep", rate: null, forecast: Math.round(freight.current * 1.065), lower: Math.round(freight.current * 1.03), upper: Math.round(freight.current * 1.1) },
+    { date: "04 Oct", rate: null, forecast: Math.round(freight.current * 1.09), lower: Math.round(freight.current * 1.045), upper: Math.round(freight.current * 1.135) },
+    { date: "11 Oct", rate: null, forecast: freight.predicted30d, lower: freight.predicted30d - 500, upper: freight.predicted30d + 500 },
+  ];
+
+  const portColumns: Column<PortDetail>[] = [
     {
       header: "Port",
       render: (p) => (
@@ -61,7 +63,7 @@ export default function DashboardPage() {
           </span>
           <div>
             <div className="font-medium text-primary">{p.name}</div>
-            <div className="text-[10px] text-secondary">{p.state}</div>
+            <div className="text-[10px] text-secondary">Discharge port</div>
           </div>
         </div>
       ),
@@ -96,13 +98,13 @@ export default function DashboardPage() {
     },
   ];
 
-  const sorted = [...data.vessels].sort((a, b) => b.score - a.score);
+  const sorted = [...vessels].sort((a, b) => b.score - a.score);
 
   return (
     <div>
       <PageHeader
         title={`Good day, ${userName || "Analyst"} — here's the chartering picture`}
-        subtitle="Live market intelligence for Coal · 70,000 t · Hay Point → Paradip · 4 voyages"
+        subtitle={`${inputs.cargo} \u00B7 ${inputs.quantity.toLocaleString()} t \u00B7 ${inputs.loadingPort} \u2192 ${inputs.destinationPort} \u00B7 ${inputs.voyages} voyages`}
         right={
           <Link
             href="/procurement"
@@ -114,60 +116,58 @@ export default function DashboardPage() {
         }
       />
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <KpiCard
           label="Current Freight"
-          value={formatUSD(data.rates.current)}
-          sub="Panamax, Australia → India"
+          value={formatUSD(freight.current)}
+          sub={`${vessels.find((v) => v.recommended)?.type ?? "Panamax"}, ${inputs.originCountry} \u2192 India`}
           icon={TrendingUp}
-          changeText="+2.6% w/w"
+          changeText={`+${freight.weeklyChange}% w/w`}
         />
         <KpiCard
           label="30-Day Forecast"
-          value={formatUSD(data.rates.predicted30d)}
-          sub="Confidence 87%"
+          value={formatUSD(freight.predicted30d)}
+          sub={`Confidence ${freight.confidence}%`}
           icon={LineChartIcon}
           tone="amber"
-          changeText="+11.5% f/c"
+          changeText={`+${freight.forecastChange30d}% f/c`}
         />
         <KpiCard
           label="Forecast Window"
-          value="Next 7 days"
+          value={freight.chartingWindow}
           sub="Optimal charter window"
           icon={AlarmClock}
           tone="default"
         />
         <KpiCard
           label="Expected Cost"
-          value={formatUSD(6_920_000, true)}
-          sub="Short-term MVP contract"
+          value={formatUSD(costs.total, true)}
+          sub={`${inputs.contractStrategy === "short" ? "Short-term" : inputs.contractStrategy === "medium" ? "Medium-term" : "Spot"} contract`}
           icon={BadgeDollarSign}
           tone="blue"
         />
         <KpiCard
           label="Potential Savings"
-          value="₹1.48 Cr"
-          sub={formatUSD(360_000) + " vs spot"}
+          value={formatUSD(potentialSavingsUSD, true)}
+          sub={`${formatUSD(potentialSavingsUSD)} vs spot`}
           icon={PiggyBank}
           tone="green"
-          changeText="−4.9% cost"
+          changeText={`\u2212${savingsPercent}% cost`}
           changeDirection="down"
         />
         <KpiCard
           label="Risk Score"
-          value="62 / 100"
-          sub="Medium · monitor congestion"
+          value={`${riskScore} / 100`}
+          sub={`${analysis.riskLevel} \u00B7 monitor congestion`}
           icon={Gauge}
           tone="amber"
         />
       </div>
 
-      {/* Row 2: Forecast + vessel */}
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2">
           <ChartCard
-            title="Freight Rate Outlook — Panamax"
+            title={`Freight Rate Outlook \u2014 ${vessels.find((v) => v.recommended)?.type ?? "Panamax"}`}
             subtitle="Historical rates with 30-day AI forecast and confidence band"
             right={
               <Link
@@ -178,15 +178,14 @@ export default function DashboardPage() {
               </Link>
             }
           >
-            <ForecastChart data={data.chart} />
+            <ForecastChart data={chart} />
           </ChartCard>
         </div>
 
-        {/* Vessel recommendation */}
         <div className="flex flex-col gap-4">
           <ChartCard
             title="Vessel Compatibility"
-            subtitle="Top picks for Paradip constraints"
+            subtitle={`Top picks for ${inputs.destinationPort} constraints`}
             right={
               <Link
                 href="/vessels"
@@ -230,11 +229,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Row 3: ports + route + alerts */}
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2">
           <ChartCard
-            title="Port Congestion Watch — East Coast India"
+            title={`Port Congestion Watch \u2014 East Coast India`}
             subtitle="Waiting times and draft constraints across candidate discharge ports"
             right={
               <Link
@@ -247,7 +245,7 @@ export default function DashboardPage() {
           >
             <DataTable
               columns={portColumns}
-              data={data.ports}
+              data={allPorts}
               rowKey={(p) => p.name}
             />
           </ChartCard>
@@ -256,7 +254,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-4">
           <ChartCard
             title="Recommended Route"
-            subtitle="Hay Point → Paradip, best balance of cost & risk"
+            subtitle={`${recommended.origin} \u2192 ${recommended.destination}, best balance of cost & risk`}
             right={
               <Link
                 href="/routes"
@@ -269,26 +267,25 @@ export default function DashboardPage() {
             <div className="space-y-2.5">
               <div className="flex items-center justify-between text-[12.5px]">
                 <span className="text-secondary">Distance</span>
-                <span className="font-semibold text-primary">6,420 nm</span>
+                <span className="font-semibold text-primary">{recommended.distance.toLocaleString()} nm</span>
               </div>
               <div className="flex items-center justify-between text-[12.5px]">
                 <span className="text-secondary">Transit time</span>
-                <span className="font-semibold text-primary">18.5 days</span>
+                <span className="font-semibold text-primary">{recommended.duration} days</span>
               </div>
               <div className="flex items-center justify-between text-[12.5px]">
                 <span className="text-secondary">Freight cost</span>
-                <span className="font-semibold text-primary">{formatUSD(1_560_000, true)}</span>
+                <span className="font-semibold text-primary">{formatUSD(recommended.freightCost, true)}</span>
               </div>
               <div className="flex items-center justify-between text-[12.5px]">
                 <span className="text-secondary">Risk level</span>
-                <RiskBadge level="Medium" label="Medium" />
+                <RiskBadge level={recommended.riskLevel} label={recommended.riskLevel} />
               </div>
             </div>
           </ChartCard>
         </div>
       </div>
 
-      {/* Alerts row */}
       <div className="mt-4">
         <ChartCard
           title="Active Alerts & Advisory"
@@ -303,8 +300,8 @@ export default function DashboardPage() {
           }
         >
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {data.alerts.slice(0, 4).map((a) => (
-              <AlertCard key={a.id} alert={a} />
+            {alerts.slice(0, 4).map((a) => (
+              <AlertCard key={a.id} alert={a as AlertItem} />
             ))}
           </div>
         </ChartCard>

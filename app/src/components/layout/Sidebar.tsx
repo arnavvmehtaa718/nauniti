@@ -6,17 +6,15 @@ import { useCallback } from "react";
 import {
   Anchor,
   BadgeCheck,
-  Bot,
   ClipboardList,
   Download,
-  FlaskConical,
   LayoutDashboard,
   Map,
   PiggyBank,
+  ScrollText,
   Settings,
   ShieldAlert,
   Ship,
-  ScrollText,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
@@ -49,19 +47,16 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "Insights" },
-  { label: "Procurement Analysis", href: "/procurement", icon: ClipboardList, section: "Insights" },
-  { label: "Freight Rate Forecast", href: "/forecast", icon: TrendingUp, section: "Insights" },
+  { label: "New Procurement Analysis", href: "/procurement", icon: ClipboardList, section: "Insights" },
+  { label: "Freight Forecast", href: "/forecast", icon: TrendingUp, section: "Insights" },
   { label: "Vessel Recommendation", href: "/vessels", icon: Ship, section: "Insights" },
   { label: "Port Analytics", href: "/ports", icon: Anchor, section: "Insights" },
   { label: "Route Optimization", href: "/routes", icon: Map, section: "Insights" },
-  { label: "Risk & Alerts Center", href: "/risk", icon: ShieldAlert, section: "Decision" },
-  { label: "Contract Strategy", href: "/contracts", icon: ScrollText, section: "Decision" },
   { label: "Cost & Savings", href: "/cost-savings", icon: PiggyBank, section: "Decision" },
-  { label: "Simulation / What-If", href: "/simulation", icon: FlaskConical, section: "Decision" },
-  { label: "AI Assistant", href: "/ai-assistant", icon: Bot, section: "Decision" },
+  { label: "Risk & Alerts", href: "/risk", icon: ShieldAlert, section: "Decision" },
+  { label: "Contract Strategy", href: "/contracts", icon: ScrollText, section: "Decision" },
   { label: "Final Recommendation", href: "/recommendation", icon: BadgeCheck, section: "Decision" },
-  { label: "Reports & Downloads", href: "/reports", icon: Download, section: "Workspace" },
-  { label: "Settings", href: "/settings", icon: Settings, section: "Workspace" },
+  { label: "Reports", href: "/reports", icon: Download, section: "Workspace" },
 ];
 
 const SECTIONS = ["Insights", "Decision", "Workspace"];
@@ -91,7 +86,7 @@ export default function Sidebar() {
         </div>
         <div>
           <div className="text-[15px] font-bold leading-4 tracking-tight text-primary">
-            Nau<span className="text-accent">Niti</span>
+            Ocean<span className="text-accent">IQ</span>
           </div>
           <div className="text-[10px] font-medium uppercase tracking-widest text-secondary">
             Charter Intelligence
@@ -133,6 +128,21 @@ export default function Sidebar() {
           </div>
         ))}
       </nav>
+
+      {/* Settings link (below main nav) */}
+      <div className="border-t border-line px-3 py-3">
+        <Link
+          href="/settings"
+          className={`group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[12.5px] transition-colors ${
+            pathname === "/settings" || pathname.startsWith("/settings/")
+              ? "nav-glow bg-blue-nav font-medium text-white"
+              : "text-secondary hover:bg-white/[0.04] hover:text-primary"
+          }`}
+        >
+          <Settings className="size-4 text-secondary group-hover:text-accent" />
+          Settings
+        </Link>
+      </div>
 
       {/* User */}
       <div className="border-t border-line p-3">

@@ -43,7 +43,7 @@ export default function SettingsPage() {
     <div>
       <PageHeader
         title="Settings"
-        subtitle="Profile, notification and default preferences for your NauNiti workspace."
+        subtitle="Profile, notification and default preferences for your OceanIQ workspace."
         right={
           <button
             onClick={() =>

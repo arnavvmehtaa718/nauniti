@@ -1,14 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { ArrowRight, Anchor, CheckCircle2, Ship, Waves } from "lucide-react";
+import {
+  CheckCircle2,
+  Ship,
+  Waves,
+} from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import ChartCard from "@/components/ui/ChartCard";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import StatusBadge from "@/components/ui/StatusBadge";
 import VesselCard from "@/components/domain/VesselCard";
-import { VESSELS, type Vessel } from "@/lib/mockData";
+import { useAppStore } from "@/store/useAppStore";
+import type { VesselRecommendation } from "@/lib/calculations";
 
 interface VesselSpec {
   draft: number;
@@ -31,14 +35,7 @@ interface ConstraintRow {
   required: string;
 }
 
-const CONSTRAINT_ROWS: ConstraintRow[] = [
-  { constraint: "Draft", unit: "m", limit: "15.0", required: "14.0" },
-  { constraint: "Length overall (LOA)", unit: "m", limit: "245", required: "225" },
-  { constraint: "Beam", unit: "m", limit: "40", required: "32" },
-  { constraint: "Cargo handling", unit: "t/day", limit: "85,000", required: "70,000" },
-];
-
-function compliance(spec: VesselSpec, constraint: string): "Pass" | "Restricted" | "Fail" {
+function compliance(spec: VesselSpec, constraint: string, portConstraints: { draft: number; loa: number; beam: number; cargo: number }): "Pass" | "Restricted" | "Fail" {
   const v = constraint === "Draft"
     ? spec.draft
     : constraint === "Length overall (LOA)"
@@ -46,15 +43,26 @@ function compliance(spec: VesselSpec, constraint: string): "Pass" | "Restricted"
       : constraint === "Beam"
         ? spec.beam
         : spec.cargo;
-  const limit = constraint === "Cargo handling" ? 85000 : constraint === "Draft" ? 15 : constraint === "Beam" ? 40 : 245;
+  const limit = constraint === "Cargo handling" ? portConstraints.cargo : constraint === "Draft" ? portConstraints.draft : constraint === "Beam" ? portConstraints.beam : portConstraints.loa;
   if (v > limit) return "Fail";
   return "Pass";
 }
 
 export default function VesselsPage() {
-  const [selected, setSelected] = useState<Vessel | null>(VESSELS.find((v) => v.recommended) ?? null);
+  const analysis = useAppStore((s) => s.procurement.analysis);
+  const [selected, setSelected] = useState<VesselRecommendation | null>(analysis.vessels.find((v) => v.recommended) ?? null);
 
-  const columns: Column<Vessel>[] = [
+  const { inputs, selectedPort } = analysis;
+  const portConstraints = { draft: selectedPort.maxDraft, loa: selectedPort.maxLOA, beam: selectedPort.maxBeam, cargo: selectedPort.cargoHandlingCapacity };
+
+  const constraintRows: ConstraintRow[] = [
+    { constraint: "Draft", unit: "m", limit: portConstraints.draft.toFixed(1), required: (portConstraints.draft - 1).toFixed(1) },
+    { constraint: "Length overall (LOA)", unit: "m", limit: portConstraints.loa.toString(), required: (portConstraints.loa - 20).toString() },
+    { constraint: "Beam", unit: "m", limit: portConstraints.beam.toString(), required: (portConstraints.beam - 8).toString() },
+    { constraint: "Cargo handling", unit: "t/day", limit: portConstraints.cargo.toLocaleString(), required: inputs.quantity.toLocaleString() },
+  ];
+
+  const columns: Column<VesselRecommendation>[] = [
     {
       header: "Vessel",
       render: (v) => (
@@ -99,7 +107,7 @@ export default function VesselsPage() {
       ),
     },
     {
-      header: "Paradip",
+      header: selectedPort.name,
       render: (v) => <StatusBadge status={v.portCompatibility} tone={v.portCompatibility === "Pass" ? "green" : v.portCompatibility === "Restricted" ? "amber" : "red"} />,
     },
   ];
@@ -108,29 +116,34 @@ export default function VesselsPage() {
     <div>
       <PageHeader
         title="Vessel Recommendation"
-        subtitle="Fleet compatibility screening against Paradip constraints for 70,000 t coal with recommended charter pick."
-        right={
-          <Link
-            href="/ports"
-            className="inline-flex items-center gap-2 rounded-lg border border-line px-3.5 py-2 text-[12.5px] font-medium text-secondary transition-colors hover:border-accent/40 hover:text-primary"
-          >
-            <Anchor className="size-4" /> Port analytics
-          </Link>
-        }
+        subtitle={`Fleet compatibility screening against ${selectedPort.name} constraints for ${inputs.quantity.toLocaleString()} t ${inputs.cargo} with recommended charter pick.`}
       />
 
-      {/* Vessel cards */}
       <div className="grid gap-4 pt-2 md:grid-cols-2 xl:grid-cols-4">
-        {VESSELS.map((v) => (
-          <VesselCard key={v.type} vessel={v} selected={selected?.type === v.type} onSelect={setSelected} />
+        {analysis.vessels.map((v) => (
+          <VesselCard
+            key={v.type}
+            vessel={{
+              type: v.type,
+              dwt: v.dwt,
+              portCompatibility: v.portCompatibility,
+              estimatedCost: v.costPerDay,
+              costPerDay: v.costPerDay,
+              recommended: v.recommended,
+              score: v.score,
+              availability: v.availability,
+              compatibilityScore: v.compatibilityScore,
+            }}
+            selected={selected?.type === v.type}
+            onSelect={setSelected as any}
+          />
         ))}
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
-        {/* Constraints table */}
         <div className="xl:col-span-2">
           <ChartCard
-            title="Paradip Port Constraints vs Vessel Specifications"
+            title={`${selectedPort.name} Port Constraints vs Vessel Specifications`}
             subtitle="Spec-level compliance against draft, LOA, beam and cargo-handling limits"
             right={
               <span className="inline-flex items-center gap-1.5 text-[11px] text-good">
@@ -142,14 +155,14 @@ export default function VesselsPage() {
             <DataTable
               columns={[
                 { header: "Constraint", render: (r: ConstraintRow) => <span className="font-medium text-primary">{r.constraint}</span> },
-                { header: "Paradip Limit", align: "right", render: (r: ConstraintRow) => <span className="text-secondary">{r.limit} {r.unit}</span> },
+                { header: `${selectedPort.name} Limit`, align: "right", render: (r: ConstraintRow) => <span className="text-secondary">{r.limit} {r.unit}</span> },
                 { header: "Required", align: "right", render: (r: ConstraintRow) => <span className="text-secondary">{r.required} {r.unit}</span> },
-                ...VESSELS.map(
+                ...analysis.vessels.map(
                   (v): Column<ConstraintRow> => ({
                     header: v.type,
                     render: (r: ConstraintRow) => {
                       const spec = VESSEL_SPECS[v.type];
-                      const status = compliance(spec, r.constraint);
+                      const status = compliance(spec, r.constraint, portConstraints);
                       return (
                         <StatusBadge
                           status={status}
@@ -160,20 +173,19 @@ export default function VesselsPage() {
                   })
                 ),
               ]}
-              data={CONSTRAINT_ROWS}
+              data={constraintRows}
               rowKey={(r) => r.constraint}
             />
             <p className="mt-3 text-[11px] leading-relaxed text-secondary">
-              Capesize exceeds Paradip draft (18.9m &gt; 15.0m) and handling scale, confirming its{" "}
-              <span className="text-warn">Restricted</span> status. Panamax clears all limits with a 87/100
-              composite score and is the recommended charter pick.
+              {selected?.portCompatibility === "Pass"
+                ? `${selected.type} clears all limits with a ${selected.score}/100 composite score and is the recommended charter pick.`
+                : `${selected?.type} may be restricted at ${selectedPort.name} — check constraint details above.`}
             </p>
           </ChartCard>
         </div>
 
-        {/* Selected vessel detail */}
         <div className="flex flex-col gap-4">
-          <ChartCard title="Selected Charter" subtitle={selected ? `${selected.type} · ${selected.dwt}` : ""}>
+          <ChartCard title="Selected Charter" subtitle={selected ? `${selected.type} \u00B7 ${selected.dwt}` : ""}>
             {selected ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between rounded-lg border border-line bg-panel p-3">
@@ -182,20 +194,14 @@ export default function VesselsPage() {
                 </div>
                 <div className="space-y-2 text-[12px]">
                   <div className="flex justify-between"><span className="text-secondary">Charter cost</span><span className="text-primary">${selected.costPerDay.toLocaleString()}/day</span></div>
-                  <div className="flex justify-between"><span className="text-secondary">Est. program cost</span><span className="text-primary">$2.23M/voyage</span></div>
-                  <div className="flex justify-between"><span className="text-secondary">Paradip compatibility</span><StatusBadge status={selected.portCompatibility} tone="green" /></div>
-                  <div className="flex justify-between"><span className="text-secondary">Cargo fit</span><span className="text-primary">{VESSEL_SPECS[selected.type].cargo.toLocaleString()} t ✓</span></div>
+                  <div className="flex justify-between"><span className="text-secondary">Est. per voyage</span><span className="text-primary">${Math.round(selected.costPerDay * 18).toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-secondary">{selectedPort.name} compatibility</span><StatusBadge status={selected.portCompatibility} tone={selected.portCompatibility === "Pass" ? "green" : "amber"} /></div>
+                  <div className="flex justify-between"><span className="text-secondary">Cargo fit</span><span className="text-primary">{VESSEL_SPECS[selected.type].cargo.toLocaleString()} t \u2713</span></div>
                 </div>
               </div>
             ) : (
               <p className="text-[12px] text-secondary">Select a vessel to inspect charter detail.</p>
             )}
-            <Link
-              href="/simulation"
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-nav py-2.5 text-[12.5px] font-medium text-white transition-colors hover:bg-blue-glow"
-            >
-              Run vessel simulation <ArrowRight className="size-3.5" />
-            </Link>
           </ChartCard>
 
           <div className="flex items-start gap-3 rounded-xl border border-line bg-panel p-3.5 text-[11.5px] leading-relaxed text-secondary">
@@ -208,10 +214,9 @@ export default function VesselsPage() {
         </div>
       </div>
 
-      {/* Comparison table */}
       <div className="mt-4">
-        <ChartCard title="Vessel Comparison" subtitle="Side-by-side cost, availability and score" >
-          <DataTable columns={columns} data={VESSELS} rowKey={(v) => v.type} />
+        <ChartCard title="Vessel Comparison" subtitle="Side-by-side cost, availability and score">
+          <DataTable columns={columns} data={analysis.vessels} rowKey={(v) => v.type} />
         </ChartCard>
       </div>
     </div>

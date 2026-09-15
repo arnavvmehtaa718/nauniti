@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Moon, Search, Sparkles, Sun } from "lucide-react";
+import { Bell, Moon, Search, Sun } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { ALERTS } from "@/lib/mockData";
 
@@ -53,14 +53,6 @@ export default function Topbar() {
         >
           {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
         </button>
-
-        <Link
-          href="/ai-assistant"
-          className="hidden items-center gap-1.5 rounded-lg bg-blue-nav px-3 py-2 text-[12px] font-medium text-white transition-colors hover:bg-blue-glow md:inline-flex"
-        >
-          <Sparkles className="size-3.5 text-accent" />
-          Ask NauNiti
-        </Link>
 
         {/* Role chip */}
         <span className="hidden rounded-md border border-accent/25 bg-accent/10 px-2 py-1 text-[11px] font-medium text-accent xl:inline">

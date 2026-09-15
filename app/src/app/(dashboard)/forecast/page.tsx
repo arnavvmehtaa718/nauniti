@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import {
-  ArrowRight,
   CalendarClock,
   Flame,
   Gauge,
@@ -18,7 +16,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import ChartCard from "@/components/ui/ChartCard";
 import LoadingState from "@/components/ui/LoadingState";
 import ForecastChart from "@/components/domain/ForecastChart";
-import api from "@/services/api";
+import { useAppStore } from "@/store/useAppStore";
 import { useEffect, useState } from "react";
 import { formatUSD } from "@/lib/calculations";
 
@@ -26,39 +24,40 @@ const DRIVER_DETAILS: Record<string, { icon: typeof Wind; note: string; dir: "up
   "Fuel price trend": { icon: Flame, note: "VLSFO bunker prices up 4.2% w/w, adding pressure on operating costs.", dir: "up" },
   "Commodity demand": { icon: Waves, note: "Seasonal coal restocking by Indian utilities is firming inquiry levels.", dir: "up" },
   "Seasonality": { icon: CalendarClock, note: "Post-monsoon wet-bulk demand typically rises through Q4 on export volume.", dir: "up" },
-  "Port congestion": { icon: Radar, note: "East-coast discharge wait times up 0.7d across Paradip/Dhamra terminals.", dir: "up" },
+  "Port congestion": { icon: Radar, note: "East-coast discharge wait times up across Paradip/Dhamra terminals.", dir: "up" },
 };
 
 export default function ForecastPage() {
-  const [data, setData] = useState<Awaited<ReturnType<typeof api.getFreightRates>> | null>(null);
+  const analysis = useAppStore((s) => s.procurement.analysis);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    let alive = true;
-    api.getFreightRates().then((d) => {
-      if (alive) setData(d);
-    });
-    return () => {
-      alive = false;
-    };
+    const t = setTimeout(() => setLoaded(true), 300);
+    return () => clearTimeout(t);
   }, []);
 
-  if (!data) return <LoadingState full label="Computing 30-day rate forecast…" />;
+  if (!loaded) return <LoadingState full label="Computing 30-day rate forecast…" />;
 
-  const { rates, chart } = data;
+  const { freight: rates, inputs } = analysis;
+  const vesselType = analysis.vessels.find((v) => v.recommended)?.type ?? "Panamax";
+  const chart = [
+    { date: "13 Aug", rate: Math.round(rates.current * 0.89), forecast: null as number | null, lower: null as number | null, upper: null as number | null },
+    { date: "20 Aug", rate: Math.round(rates.current * 0.91), forecast: null, lower: null, upper: null },
+    { date: "27 Aug", rate: Math.round(rates.current * 0.935), forecast: null, lower: null, upper: null },
+    { date: "03 Sep", rate: Math.round(rates.current * 0.965), forecast: null, lower: null, upper: null },
+    { date: "10 Sep", rate: Math.round(rates.current * 0.985), forecast: null, lower: null, upper: null },
+    { date: "13 Sep", rate: rates.current, forecast: rates.current, lower: rates.current - 250, upper: rates.current + 250 },
+    { date: "20 Sep", rate: null, forecast: Math.round(rates.current * 1.03), lower: Math.round(rates.current * 1.005), upper: Math.round(rates.current * 1.055) },
+    { date: "27 Sep", rate: null, forecast: Math.round(rates.current * 1.065), lower: Math.round(rates.current * 1.03), upper: Math.round(rates.current * 1.1) },
+    { date: "04 Oct", rate: null, forecast: Math.round(rates.current * 1.09), lower: Math.round(rates.current * 1.045), upper: Math.round(rates.current * 1.135) },
+    { date: "11 Oct", rate: null, forecast: rates.predicted30d, lower: rates.predicted30d - 500, upper: rates.predicted30d + 500 },
+  ];
 
   return (
     <div>
       <PageHeader
         title="Freight Rate Forecast"
-        subtitle="AI time-series forecast for Panamax on the Australia → East Coast India corridor, with confidence bands and market context."
-        right={
-          <Link
-            href="/simulation"
-            className="inline-flex items-center gap-2 rounded-lg border border-line px-3.5 py-2 text-[12.5px] font-medium text-secondary transition-colors hover:border-accent/40 hover:text-primary"
-          >
-            Test sensitivity <ArrowRight className="size-4" />
-          </Link>
-        }
+        subtitle={`${vesselType} on the ${inputs.loadingPort} \u2192 ${inputs.destinationPort} corridor, with confidence bands and market context.`}
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -67,10 +66,10 @@ export default function ForecastPage() {
           value={formatUSD(rates.current)}
           sub="as of 13 Sep 2026"
           icon={TrendingUp}
-          changeText="+2.6% w/w"
+          changeText={`+${rates.weeklyChange}% w/w`}
         />
         <KpiCard
-          label="Predicted · 30d"
+          label="Predicted \u00B7 30d"
           value={formatUSD(rates.predicted30d)}
           sub="model expectation"
           icon={Gauge}
@@ -96,8 +95,8 @@ export default function ForecastPage() {
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2">
           <ChartCard
-            title="Rate Outlook — 5 weeks"
-            subtitle="Solid line: actuals · dashed line: forecast · shaded band: 80% confidence interval"
+            title="Rate Outlook \u2014 5 weeks"
+            subtitle="Solid line: actuals \u00B7 dashed line: forecast \u00B7 shaded band: 80% confidence interval"
             right={
               <span className="rounded-md border border-line px-2 py-1 text-[10.5px] font-medium uppercase tracking-wider text-secondary">
                 {rates.trend} trend
@@ -109,7 +108,6 @@ export default function ForecastPage() {
         </div>
 
         <div className="flex flex-col gap-4">
-          {/* Summary */}
           <ChartCard title="Forecast Summary" subtitle="What the model expects">
             <div className="space-y-3">
               <p className="text-[12px] leading-relaxed text-secondary">
@@ -121,36 +119,29 @@ export default function ForecastPage() {
               <div className="space-y-2 border-t border-line pt-3">
                 <div className="flex items-center justify-between text-[12px]">
                   <span className="text-secondary">Window in which rates stay favorable</span>
-                  <span className="font-semibold text-good">Next 7 days</span>
+                  <span className="font-semibold text-good">{rates.chartingWindow}</span>
                 </div>
                 <div className="flex items-center justify-between text-[12px]">
-                  <span className="text-secondary">Model confidence band (±250/day)</span>
+                  <span className="text-secondary">Model confidence band</span>
                   <span className="font-semibold text-primary">{rates.confidence}%</span>
                 </div>
               </div>
             </div>
           </ChartCard>
 
-          {/* Suggested action */}
           <div className="rounded-xl border border-good/30 bg-good/5 p-4">
             <div className="mb-2 inline-flex items-center gap-1.5 rounded-md bg-good/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-good">
               <Lightbulb className="size-3.5" /> Suggested action
             </div>
             <h3 className="text-[14px] font-semibold text-primary">
-              Lock in charter capacity within the next 7 days
+              Lock in charter capacity within {rates.chartingWindow.toLowerCase()}
             </h3>
             <p className="mt-1.5 text-[12px] leading-relaxed text-secondary">
               Waiting past the window adds an estimated{" "}
-              <span className="font-medium text-primary">$36K–$50K per voyage</span> — up to{" "}
-              <span className="font-medium text-primary">$200K across the 4-voyage program</span>. Current Panamax
+              <span className="font-medium text-primary">$36K\u2013$50K per voyage</span> \u2014 up to{" "}
+              <span className="font-medium text-primary">{formatUSD(Math.round(50000 * inputs.voyages))} across the {inputs.voyages}-voyage program</span>. Current {vesselType}
               availability supports immediate fixture.
             </p>
-            <Link
-              href="/recommendation"
-              className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-good hover:text-primary"
-            >
-              View final recommendation <ArrowRight className="size-3.5" />
-            </Link>
           </div>
         </div>
       </div>
@@ -159,7 +150,7 @@ export default function ForecastPage() {
       <div className="mt-4">
         <ChartCard title="Market Drivers" subtitle="Factors influencing the forecast horizon">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {data.drivers.map((d) => {
+            {Object.keys(DRIVER_DETAILS).map((d) => {
               const detail = DRIVER_DETAILS[d];
               const Icon = detail.icon;
               return (

@@ -12,9 +12,9 @@ import {
   YAxis,
 } from "recharts";
 import { formatUSD } from "@/lib/calculations";
-import type { FREIGHT_CHART_DATA } from "@/lib/mockData";
+import type { FreightChartPoint } from "@/lib/mockData";
 
-type DataPoint = (typeof FREIGHT_CHART_DATA)[number];
+type DataPoint = FreightChartPoint;
 
 interface TooltipEntry {
   name?: string;

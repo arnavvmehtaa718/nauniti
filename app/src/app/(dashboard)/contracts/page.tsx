@@ -16,11 +16,16 @@ import PageHeader from "@/components/ui/PageHeader";
 import ChartCard from "@/components/ui/ChartCard";
 import StatusBadge from "@/components/ui/StatusBadge";
 import CostBreakdown from "@/components/domain/CostBreakdown";
-import { CONTRACT_STRATEGIES, COST_BREAKDOWN, COST_SAVINGS, type ContractStrategy } from "@/lib/mockData";
+import { useAppStore } from "@/store/useAppStore";
 import { formatUSD } from "@/lib/calculations";
+import type { StrategyComparison } from "@/lib/calculations";
 
 export default function ContractsPage() {
-  const chartData = CONTRACT_STRATEGIES.map((s) => ({
+  const analysis = useAppStore((s) => s.procurement.analysis);
+  const { strategies, costs, inputs, potentialSavingsUSD } = analysis;
+  const selectedStrat = strategies.find((s) => s.recommended) ?? strategies[1];
+
+  const chartData = strategies.map((s) => ({
     name: s.code,
     label: s.name,
     value: s.totalCost,
@@ -31,12 +36,11 @@ export default function ContractsPage() {
     <div>
       <PageHeader
         title="Contract Strategy"
-        subtitle="Chartering structure options for the 70,000 t coal program across a 3-month horizon."
+        subtitle={`Chartering structure options for the ${inputs.quantity.toLocaleString()} t ${inputs.cargo} program across a ${inputs.contractHorizon.toLowerCase()} horizon.`}
       />
 
-      {/* Strategy cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        {CONTRACT_STRATEGIES.map((s) => (
+        {strategies.map((s) => (
           <div
             key={s.code}
             className={`relative flex flex-col gap-3 rounded-xl border p-4 ${
@@ -45,7 +49,7 @@ export default function ContractsPage() {
           >
             {s.recommended && (
               <span className="absolute -top-2.5 left-4 inline-flex items-center gap-1 rounded-full bg-good px-2 py-0.5 text-[10px] font-semibold text-emerald-950">
-                <Star className="size-3 fill-emerald-950" /> NauNiti Recommended
+                <Star className="size-3 fill-emerald-950" /> OceanIQ Recommended
               </span>
             )}
             <div className="flex items-start justify-between">
@@ -89,7 +93,6 @@ export default function ContractsPage() {
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        {/* Cost comparison chart */}
         <ChartCard title="Total Cost Comparison" subtitle="All-in program cost by contract structure">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
@@ -137,26 +140,25 @@ export default function ContractsPage() {
           </div>
         </ChartCard>
 
-        {/* Cost breakdown */}
         <ChartCard
           title="Detailed Cost Breakdown"
-          subtitle="Recommended strategy (Short-Term MVP) — $6.92M all-in"
+          subtitle={`Recommended strategy (${selectedStrat.name}) \u2014 ${formatUSD(selectedStrat.totalCost)} all-in`}
           right={
             <span className="inline-flex items-center gap-1 rounded-md bg-good/10 px-2 py-1 text-[10.5px] font-semibold text-good">
-              <BadgeCheck className="size-3.5" /> {formatUSD(COST_SAVINGS.potentialSavingsUSD)} saved vs spot
+              <BadgeCheck className="size-3.5" /> {formatUSD(potentialSavingsUSD)} saved vs spot
             </span>
           }
         >
           <CostBreakdown
             items={[
-              { key: "freight", name: "Freight", value: COST_BREAKDOWN.freightCost },
-              { key: "fuel", name: "Fuel", value: COST_BREAKDOWN.fuelCost },
-              { key: "portCharges", name: "Port Charges", value: COST_BREAKDOWN.portCharges },
-              { key: "demurrage", name: "Waiting / Demurrage", value: COST_BREAKDOWN.waitingDemurrage },
-              { key: "repositioning", name: "Repositioning", value: COST_BREAKDOWN.repositioningCost },
-              { key: "riskBuffer", name: "Risk Buffer", value: COST_BREAKDOWN.riskBuffer },
+              { key: "freight", name: "Freight", value: costs.freightCost },
+              { key: "fuel", name: "Fuel", value: costs.fuelCost },
+              { key: "portCharges", name: "Port Charges", value: costs.portCharges },
+              { key: "demurrage", name: "Waiting / Demurrage", value: costs.waitingDemurrage },
+              { key: "repositioning", name: "Repositioning", value: costs.repositioningCost },
+              { key: "riskBuffer", name: "Risk Buffer", value: costs.riskBuffer },
             ]}
-            total={COST_BREAKDOWN.total}
+            total={costs.total}
           />
         </ChartCard>
       </div>
@@ -164,12 +166,12 @@ export default function ContractsPage() {
       <div className="mt-4 flex items-start gap-3 rounded-xl border border-accent/30 bg-accent/5 p-4">
         <Info className="mt-0.5 size-4 shrink-0 text-accent" />
         <div className="text-[12px] leading-relaxed text-secondary">
-          <span className="font-semibold text-primary">Why not medium-term?</span> It is $240K cheaper but locks
-          pricing for a full horizon with low flexibility — risky if SAIL demand shifts. The{" "}
-          <span className="text-accent">Short-Term Multiple-Voyage Contract</span> keeps $360K of the savings while
-          retaining negotiation headroom after 3 months.{" "}
+          <span className="font-semibold text-primary">Why not medium-term?</span> It is {formatUSD(strategies[1].totalCost - strategies[2].totalCost)} cheaper but locks
+          pricing for a full horizon with low flexibility — risky if demand shifts. The{" "}
+          <span className="text-accent">{selectedStrat.name}</span> keeps {formatUSD(potentialSavingsUSD)} of the savings while
+          retaining negotiation headroom after {inputs.contractHorizon.toLowerCase()}.{" "}
           <Link href="/cost-savings" className="font-medium text-accent hover:text-primary">
-            See the full cost & savings view →
+            See the full cost & savings view \u2192
           </Link>
         </div>
       </div>
@@ -177,7 +179,7 @@ export default function ContractsPage() {
   );
 }
 
-function AttrRow({ label, value }: { label: string; value: ContractStrategy["priceCertainty"] }) {
+function AttrRow({ label, value }: { label: string; value: StrategyComparison["priceCertainty"] }) {
   const tone = value === "High" ? "green" : value === "Medium" ? "amber" : "red";
   return (
     <div className="flex items-center justify-between">

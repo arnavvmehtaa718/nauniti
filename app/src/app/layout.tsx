@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "NauNiti — Maritime Chartering Intelligence",
+  title: "OceanIQ — Maritime Chartering Intelligence",
   description:
     "AI-Powered Maritime Chartering Decision Intelligence for SAIL procurement planning.",
 };
@@ -20,8 +20,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full">
         {children}
-        <Script id="nauniti-theme-init" strategy="beforeInteractive">
-          {`(function(){try{var t=window.localStorage.getItem("nauniti-theme");if(t==="light"){document.documentElement.classList.add("light");document.documentElement.style.colorScheme="light";}}catch(e){}})();`}
+        <Script id="oceaniq-theme-init" strategy="beforeInteractive">
+          {`(function(){try{var t=window.localStorage.getItem("oceaniq-theme");if(t==="light"){document.documentElement.classList.add("light");document.documentElement.style.colorScheme="light";}}catch(e){}})();`}
         </Script>
         <ThemeController />
       </body>

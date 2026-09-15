@@ -6,7 +6,7 @@ import { useAppStore } from "@/store/useAppStore";
 export default function ThemeController() {
   useEffect(() => {
     const stored =
-      typeof window !== "undefined" ? window.localStorage.getItem("nauniti-theme") : null;
+      typeof window !== "undefined" ? window.localStorage.getItem("oceaniq-theme") : null;
     useAppStore.getState().setTheme(stored === "light" ? "light" : "dark");
   }, []);
 
